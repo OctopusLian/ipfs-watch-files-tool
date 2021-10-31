@@ -8,6 +8,8 @@
 -  
 ## Usage  
 
+### [Version1](./version1_ticker/main.go)  
+
 ```
 $ go run main.go 
 ipfs watch dir is:  /home/neo/Code/go/src/github.com/OctopusLian/ipfs-watch-files-tool/test
@@ -25,3 +27,9 @@ hello1
 $ ipfs cat QmaRGe7bVmVaLmxbrMiVNXqW4pRNNp3xq7hFtyRKA3mtJL
 world
 ```
+
+### [Version2](./version2_fsnotify/main.go)  
+
+## Helpful Link  
+
+[golang 通过fsnotify监控文件，并通过文件变化重启程序](https://www.cnblogs.com/jkko123/p/7256927.html)

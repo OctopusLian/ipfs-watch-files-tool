@@ -3,6 +3,7 @@ module github.com/OctopusLian/ipfs-watch-files-tool
 go 1.17
 
 require (
+	github.com/fsnotify/fsnotify v1.4.7
 	github.com/ipfs/go-ipfs-api v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 )
