@@ -21,7 +21,7 @@ type Watch struct {
 
 //监控目录
 func (w *Watch) watchDir(dir string) {
-	//FileCidMap = make(map[string]string)
+	FileCidMap = make(map[string]string)
 
 	sh := shell.NewShell("localhost:5001")
 	log.Info("ipfs start")
@@ -81,41 +81,42 @@ func (w *Watch) watchDir(dir string) {
 								log.Error("ipfs add failed: ", err)
 							}
 							log.Info("ipfs add file:"+ev.Name+" cid is: ", cid)
-							//FileCidMap[ev.Name] = cid
+							FileCidMap[ev.Name] = cid
 						}
-
 					}
 					if ev.Op&fsnotify.Write == fsnotify.Write {
-						fmt.Println("写入文件 : ", ev.Name)
+						fmt.Println("更新文件 : ", ev.Name)
 						data, err := ioutil.ReadFile(ev.Name)
 						if err != nil {
 							log.Error("Read File error: %s", err)
 							continue
 						}
-						// cid, err := sh.Add(strings.NewReader(string(data)))
-						// if err != nil {
-						// 	log.Error("ipfs add failed: ", err)
+						// opt := func(builder *shell.RequestBuilder) error {
+						// 	builder.Option("p", true)
+						// 	return nil
 						// }
-						opt := func(builder *shell.RequestBuilder) error {
-							builder.Option("p", true)
-							return nil
-						}
-						err = sh.FilesWrite(c, ev.Name, strings.NewReader(string(data)), opt) //TODO:如何获取命令行输入的内容
+						// err = sh.FilesWrite(c, ev.Name, strings.NewReader(string(data)), opt) //TODO:如何获取命令行输入的内容
+						// if err != nil {
+						// 	log.Error("ipfs write file failed: ", ev.Name)
+						// 	continue
+						// }
+						cid, err := sh.Add(strings.NewReader(string(data)))
 						if err != nil {
-							log.Error("ipfs write file failed: ", ev.Name)
-							continue
+							log.Error("ipfs add failed: ", err)
 						}
+						log.Info("ipfs modify file:"+ev.Name+" cid is: ", cid)
 						log.Info("ipfs write file success:" + ev.Name)
 						//FileCidMap[ev.Name] = cid
 					}
 					if ev.Op&fsnotify.Remove == fsnotify.Remove {
 						fmt.Println("删除文件 : ", ev.Name)
 						//如果删除文件是目录，则移除监控
+
 						fi, err := os.Stat(ev.Name)
 						if err == nil && fi.IsDir() { // this name is dir
 							w.watch.Remove(ev.Name)
 							fmt.Println("删除监控 : ", ev.Name)
-							err = sh.FilesRm(c, ev.Name, true) //TODO:参数true代表删除目录是否递归？
+							err = sh.FilesRm(c, ev.Name, false) //TODO:参数true代表删除目录是否递归？
 							if err != nil {
 								log.Error("ipfs rm dir failed: ", err)
 								continue
@@ -131,7 +132,7 @@ func (w *Watch) watchDir(dir string) {
 							log.Info("ipfs rm success: ", ev.Name)
 						}
 
-						//delete(FileCidMap, ev.Name)
+						delete(FileCidMap, ev.Name)
 					}
 					if ev.Op&fsnotify.Rename == fsnotify.Rename {
 						fmt.Println("重命名文件 : ", ev.Name)
@@ -141,11 +142,23 @@ func (w *Watch) watchDir(dir string) {
 						//所以这里就简单粗爆的直接remove好了
 						w.watch.Remove(ev.Name)
 						//ipfs rm
-						err := sh.FilesRm(c, ev.Name, true)
+						opt := func(builder *shell.RequestBuilder) error {
+							builder.Option("p", true)
+							return nil
+						}
+						fi, err := sh.FilesLs(c, ev.Name, opt)
+						if len(fi) == 0 {
+							log.Error("文件不存在,原因是：", err)
+							continue
+						}
+
+						err = sh.FilesRm(c, ev.Name, false)
 						if err != nil {
 							log.Error("ipfs rm failed: ", err)
+							//continue
 						}
 						log.Info("ipfs rm success: ", ev.Name)
+						delete(FileCidMap, ev.Name)
 					}
 					if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
 						fmt.Println("修改权限 : ", ev.Name)
