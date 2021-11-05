@@ -13,13 +13,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var FileCidMap map[string]string //var声明，不占用内存
+var FileCidMap map[string]string
 
 type Watch struct {
 	watch *fsnotify.Watcher
 }
 
-//监控目录
+//watch dir
 func (w *Watch) watchDir(dir string) {
 	FileCidMap = make(map[string]string)
 
@@ -28,10 +28,8 @@ func (w *Watch) watchDir(dir string) {
 
 	c := context.Background()
 
-	//通过Walk来遍历目录下的所有子目录
+	//use Walk function to range son dir
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		//这里判断是否为目录，只需监控目录即可
-		//目录下的文件也在监控范围内，不需要我们一个一个加
 		if info.IsDir() {
 			path, err := filepath.Abs(path)
 			if err != nil {
@@ -41,7 +39,7 @@ func (w *Watch) watchDir(dir string) {
 			if err != nil {
 				return err
 			}
-			fmt.Println("监控 : ", path)
+			fmt.Println("watch : ", path)
 		}
 		return nil
 	})
@@ -51,12 +49,11 @@ func (w *Watch) watchDir(dir string) {
 			case ev := <-w.watch.Events:
 				{
 					if ev.Op&fsnotify.Create == fsnotify.Create {
-						fmt.Println("创建文件 : ", ev.Name)
-						//这里获取新创建文件的信息，如果是目录，则加入监控中
+						fmt.Println("create file : ", ev.Name)
 						fi, err := os.Stat(ev.Name)
 						if err == nil && fi.IsDir() {
 							w.watch.Add(ev.Name)
-							fmt.Println("添加监控 : ", ev.Name)
+							fmt.Println("add watch : ", ev.Name)
 
 							//ipfs add dir
 							opt := func(builder *shell.RequestBuilder) error {
@@ -85,7 +82,7 @@ func (w *Watch) watchDir(dir string) {
 						}
 					}
 					if ev.Op&fsnotify.Write == fsnotify.Write {
-						fmt.Println("更新文件 : ", ev.Name)
+						fmt.Println("update file : ", ev.Name)
 						data, err := ioutil.ReadFile(ev.Name)
 						if err != nil {
 							log.Error("Read File error: %s", err)
@@ -102,7 +99,8 @@ func (w *Watch) watchDir(dir string) {
 						// }
 						cid, err := sh.Add(strings.NewReader(string(data)))
 						if err != nil {
-							log.Error("ipfs add failed: ", err)
+							log.Error("ipfs modify failed: ", err)
+							continue
 						}
 						log.Info("ipfs modify file:"+ev.Name+" cid is: ", cid)
 						log.Info("ipfs write file success:" + ev.Name)
@@ -110,7 +108,6 @@ func (w *Watch) watchDir(dir string) {
 					}
 					if ev.Op&fsnotify.Remove == fsnotify.Remove {
 						fmt.Println("删除文件 : ", ev.Name)
-						//如果删除文件是目录，则移除监控
 
 						fi, err := os.Stat(ev.Name)
 						if err == nil && fi.IsDir() { // this name is dir
@@ -123,7 +120,6 @@ func (w *Watch) watchDir(dir string) {
 							}
 							log.Info("ipfs rm dir success: ", ev.Name)
 						} else {
-							//是文件，就不需要移除监控，直接ipfs调用删除接口
 							err = sh.FilesRm(c, ev.Name, false)
 							if err != nil {
 								log.Error("ipfs rm file failed: ", err)
@@ -135,11 +131,7 @@ func (w *Watch) watchDir(dir string) {
 						delete(FileCidMap, ev.Name)
 					}
 					if ev.Op&fsnotify.Rename == fsnotify.Rename {
-						fmt.Println("重命名文件 : ", ev.Name)
-						//如果重命名文件是目录，则移除监控
-						//注意这里无法使用os.Stat来判断是否是目录了
-						//因为重命名后，go已经无法找到原文件来获取信息了
-						//所以这里就简单粗爆的直接remove好了
+						fmt.Println("rename file : ", ev.Name)
 						w.watch.Remove(ev.Name)
 						//ipfs rm
 						opt := func(builder *shell.RequestBuilder) error {
@@ -148,7 +140,7 @@ func (w *Watch) watchDir(dir string) {
 						}
 						fi, err := sh.FilesLs(c, ev.Name, opt)
 						if len(fi) == 0 {
-							log.Error("文件不存在,原因是：", err)
+							log.Error("the reason why file not exist：", err)
 							continue
 						}
 
@@ -161,7 +153,7 @@ func (w *Watch) watchDir(dir string) {
 						delete(FileCidMap, ev.Name)
 					}
 					if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
-						fmt.Println("修改权限 : ", ev.Name)
+						fmt.Println("chmod permit : ", ev.Name)
 
 					}
 				}
@@ -176,7 +168,7 @@ func (w *Watch) watchDir(dir string) {
 }
 
 func main() {
-	//0，准备工作
+	//0，init
 	filePath := "/home/neo/Code/go/src/github.com/OctopusLian/ipfs-watch-files-tool/test"
 	fmt.Println("ipfs watch dir is: ", filePath)
 
@@ -189,6 +181,6 @@ func main() {
 		watch: watch,
 	}
 	w.watchDir(filePath)
-	//循环
+	//loop
 	select {}
 }
